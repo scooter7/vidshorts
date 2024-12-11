@@ -3,7 +3,6 @@ import openai
 import requests
 from elevenlabs import ElevenLabs
 from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, CompositeVideoClip, vfx
-import base64
 import os
 from captacity import add_captions  # Captacity integration
 
@@ -55,14 +54,13 @@ if st.session_state.script:
         for idx, sentence in enumerate(sentences):
             # Generate image
             st.write(f"Generating image for sentence {idx + 1}...")
-            context = f"A video about {topic}"
-            prompt = f"Generate an image without any text that describes: {sentence}. Context: {context}"
-            response = openai.Image.create(
-                prompt=prompt,
+            image_prompt = f"A realistic and engaging image representing: {sentence}"
+            image_response = openai.Image.create(
+                prompt=image_prompt,
                 n=1,
                 size="1024x1024"
             )
-            image_url = response["data"][0]["url"]
+            image_url = image_response["data"][0]["url"]
 
             # Download the image from the URL
             image_filename = f"images/image_{idx}.jpg"
