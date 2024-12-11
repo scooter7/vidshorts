@@ -1,13 +1,15 @@
 import streamlit as st
-import openai
-import requests
+from openai import OpenAI
 from elevenlabs import ElevenLabs
 from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, CompositeVideoClip, vfx
+import requests
 import os
 from captacity import add_captions  # Captacity integration
 
-# Set API keys from Streamlit secrets
-openai.api_key = st.secrets["openai_api_key"]
+# Set up OpenAI client
+client = OpenAI()
+
+# Set ElevenLabs API key from Streamlit secrets
 elevenlabs_client = ElevenLabs(api_key=st.secrets["elevenlabs_api_key"])
 
 # App title and description
@@ -24,8 +26,8 @@ if topic and st.button("Generate Script"):
     st.write("Generating story script...")
     prompt = f"Write a short story about the topic: {topic}. Make it engaging, concise, and suitable for a video."
 
-    # Correct syntax for GPT-4o
-    response = openai.chat.completions.create(
+    # Generate story script using OpenAI GPT-4
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}]
     )
@@ -52,15 +54,17 @@ if st.session_state.script:
         os.makedirs("audio", exist_ok=True)
 
         for idx, sentence in enumerate(sentences):
-            # Generate image
+            # Generate image using DALL-E 3
             st.write(f"Generating image for sentence {idx + 1}...")
-            image_prompt = f"A realistic and engaging image representing: {sentence}"
-            image_response = openai.Image.create(
+            image_prompt = f"A visually engaging representation of: {sentence}"
+            response = client.images.generate(
+                model="dall-e-3",
                 prompt=image_prompt,
-                n=1,
-                size="1024x1024"
+                size="1024x1024",
+                quality="standard",
+                n=1
             )
-            image_url = image_response["data"][0]["url"]
+            image_url = response.data[0].url
 
             # Download the image from the URL
             image_filename = f"images/image_{idx}.jpg"
