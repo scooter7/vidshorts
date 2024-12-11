@@ -1,7 +1,12 @@
 import streamlit as st
 import openai
 from elevenlabs import ElevenLabs
-from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeAudioClip
+# Importing directly from moviepy
+from moviepy import editor
+ImageClip = editor.ImageClip
+AudioFileClip = editor.AudioFileClip
+concatenate_videoclips = editor.concatenate_videoclips
+CompositeAudioClip = editor.CompositeAudioClip
 import base64
 import os
 from captacity import add_captions  # Captacity integration
