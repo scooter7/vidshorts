@@ -19,11 +19,13 @@ topic = st.text_input("Enter the topic for your video:")
 if topic and st.button("Generate Script"):
     st.write("Generating story script...")
     prompt = f"Write a short story about the topic: {topic}. Make it engaging, concise, and suitable for a video."
-    response = openai.chat.completions.create(
+
+    # Correct syntax for GPT-4o
+    response = openai.ChatCompletion.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}]
     )
-    story_script = response["choices"][0]["message"]["content"]
+    story_script = response.choices[0].message['content']
     st.write("Generated Script:")
     st.text_area("Story Script", story_script, height=200)
 
