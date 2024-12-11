@@ -21,7 +21,7 @@ if topic and st.button("Generate Script"):
     prompt = f"Write a short story about the topic: {topic}. Make it engaging, concise, and suitable for a video."
 
     # Correct syntax for GPT-4o
-    response = openai.ChatCompletion.create(
+    response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}]
     )
