@@ -4,7 +4,7 @@ from elevenlabs import ElevenLabs
 from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, CompositeVideoClip, vfx
 import requests
 import os
-from captacity import add_captions  # Captacity integration
+import captacity  # Captacity integration
 
 # Set up OpenAI client with API key
 client = OpenAI(api_key=st.secrets["openai_api_key"])
@@ -93,19 +93,20 @@ if st.session_state.script:
 
         # Step 2: Combine video clips
         st.write("Combining all video clips...")
+        final_video_path = "final_video.mp4"
         final_video = concatenate_videoclips(video_clips, method="compose")
+        final_video.write_videofile(final_video_path, codec="libx264", audio_codec="aac", fps=30)
 
         # Step 3: Add captions with Captacity
         st.write("Adding captions...")
         captioned_video_path = "output_with_captions.mp4"
-        add_captions(final_video, story_script, output_path=captioned_video_path)
+        captacity.add_captions(
+            video_file=final_video_path,
+            output_file=captioned_video_path,
+        )
 
-        # Save final video
-        output_video_path = "final_video.mp4"
-        final_video.write_videofile(output_video_path, codec="libx264", audio_codec="aac", fps=30)
-
-        # Step 4: Download the video
+        # Step 4: Download the video with captions
         st.write("Video generation complete!")
-        with open(output_video_path, "rb") as video_file:
+        with open(captioned_video_path, "rb") as video_file:
             video_bytes = video_file.read()
-            st.download_button("Download Video", video_bytes, file_name="final_video.mp4", mime="video/mp4")
+            st.download_button("Download Video", video_bytes, file_name="final_video_with_captions.mp4", mime="video/mp4")
