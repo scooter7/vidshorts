@@ -14,6 +14,10 @@ elevenlabs_client = ElevenLabs(api_key=st.secrets["elevenlabs_api_key"])
 st.title("Storytelling Video Creator")
 st.write("Generate videos with images, narration, and captions from your topic.")
 
+# Initialize session state for the script
+if "script" not in st.session_state:
+    st.session_state.script = ""
+
 # Input: Topic
 topic = st.text_input("Enter the topic for your video:")
 if topic and st.button("Generate Script"):
@@ -24,17 +28,20 @@ if topic and st.button("Generate Script"):
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}]
-)
+    )
+    st.session_state.script = response.choices[0].message.content
 
-    # Correct way to access the content
-    story_script = response.choices[0].message.content
+# Display the generated script if available
+if st.session_state.script:
     st.write("Generated Script:")
-    st.text_area("Story Script", story_script, height=200)
+    story_script = st.text_area(
+        "Story Script",
+        st.session_state.script,
+        height=200,
+        key="story_script"
+    )
 
-
-    # Allow editing the generated script
-    story_script = st.text_area("Edit the generated story script (if needed):", value=story_script, height=200)
-
+    # Allow editing of the generated script
     if st.button("Generate Video"):
         st.write("Processing...")
 
