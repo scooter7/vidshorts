@@ -1,5 +1,6 @@
 import streamlit as st
 import openai
+import requests
 from elevenlabs import ElevenLabs
 from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, CompositeVideoClip, vfx
 import base64
@@ -57,14 +58,17 @@ if st.session_state.script:
             context = f"A video about {topic}"
             prompt = f"Generate an image without any text that describes: {sentence}. Context: {context}"
             response = openai.Image.create(
-                model="dall-e-3",
                 prompt=prompt,
-                size="1024x1792",
-                response_format="b64_json"
+                n=1,
+                size="1024x1024"
             )
+            image_url = response["data"][0]["url"]
+
+            # Download the image from the URL
             image_filename = f"images/image_{idx}.jpg"
+            image_data = requests.get(image_url).content
             with open(image_filename, "wb") as f:
-                f.write(base64.b64decode(response["data"][0]["b64_json"]))
+                f.write(image_data)
 
             # Generate audio
             st.write(f"Generating audio for sentence {idx + 1}...")
