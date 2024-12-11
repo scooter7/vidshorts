@@ -6,8 +6,8 @@ import requests
 import os
 from captacity import add_captions  # Captacity integration
 
-# Set up OpenAI client
-client = OpenAI()
+# Set up OpenAI client with API key
+client = OpenAI(api_key=st.secrets["openai_api_key"])
 
 # Set ElevenLabs API key from Streamlit secrets
 elevenlabs_client = ElevenLabs(api_key=st.secrets["elevenlabs_api_key"])
