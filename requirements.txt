@@ -3,3 +3,4 @@ openai
 elevenlabs
 moviepy==1.0.3
 captacity
+requests
