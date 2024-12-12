@@ -76,7 +76,7 @@ if st.session_state.script:
             response = client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
-                size="256x256",  # Supported size
+                size="512x512",  # Supported size
                 quality="standard",
                 n=1
             )
