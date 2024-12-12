@@ -20,6 +20,21 @@ st.write("Generate videos with images, narration, and captions from your topic."
 if "script" not in st.session_state:
     st.session_state.script = ""
 
+# Placeholder image setup
+placeholder_url = "https://raw.githubusercontent.com/scooter7/vidshorts/main/placeholder.jpg"
+placeholder_path = "placeholder.jpg"
+
+# Ensure the placeholder image exists locally
+if not os.path.exists(placeholder_path):
+    try:
+        placeholder_image_data = requests.get(placeholder_url).content
+        with open(placeholder_path, "wb") as f:
+            f.write(placeholder_image_data)
+        st.info("Downloaded placeholder image successfully.")
+    except Exception as e:
+        st.error(f"Failed to download placeholder image: {e}")
+        placeholder_path = None  # Disable fallback if download fails
+
 # Input: Topic
 topic = st.text_input("Enter the topic for your video:")
 if topic and st.button("Generate Script"):
@@ -29,7 +44,7 @@ if topic and st.button("Generate Script"):
     # Generate story script using OpenAI GPT-4
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
         st.session_state.script = response.choices[0].message.content
@@ -61,7 +76,7 @@ if st.session_state.script:
             response = client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
-                size="512x512",  # Reduced size to lower final video resolution
+                size="256x256",  # Supported size
                 quality="standard",
                 n=1
             )
@@ -74,7 +89,7 @@ if st.session_state.script:
 
             try:
                 image_url = generate_image_cached(image_prompt)
-                
+
                 # Download the image from the URL
                 image_filename = f"images/image_{idx}.jpg"
                 image_data = requests.get(image_url).content
@@ -83,7 +98,11 @@ if st.session_state.script:
 
             except Exception as e:
                 st.warning(f"Image generation failed for sentence {idx + 1}. Error: {e}")
-                image_filename = "placeholder.jpg"  # Path to a local placeholder image
+                if placeholder_path:
+                    image_filename = placeholder_path  # Use the placeholder image
+                else:
+                    st.error("No placeholder available. Skipping this frame.")
+                    continue
 
             # Generate audio
             st.write(f"Generating audio for sentence {idx + 1}...")
@@ -119,40 +138,29 @@ if st.session_state.script:
             try:
                 final_video = concatenate_videoclips(video_clips, method="compose")
 
-                # Split video into chunks if size exceeds limits
-                chunk_duration = 120  # Split into 2-minute chunks
-                video_chunks = [
-                    final_video.subclip(i, min(i + chunk_duration, final_video.duration))
-                    for i in range(0, int(final_video.duration), chunk_duration)
-                ]
+                # Save final video
+                final_video_path = "final_video.mp4"
+                final_video.write_videofile(
+                    final_video_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    fps=24,
+                    bitrate="500k"  # Adjust bitrate for compression
+                )
 
-                for idx, chunk in enumerate(video_chunks):
-                    chunk_path = f"chunk_{idx}.mp4"
-                    chunk.write_videofile(
-                        chunk_path, 
-                        codec="libx264", 
-                        audio_codec="aac", 
-                        fps=24,  # Lower fps to reduce file size
-                        bitrate="500k"  # Adjust bitrate for compression
-                    )
+                # Step 3: Add captions with Captacity
+                st.write("Adding captions...")
+                captioned_video_path = "output_with_captions.mp4"
+                captacity.add_captions(
+                    video_file=final_video_path,
+                    output_file=captioned_video_path,
+                )
 
-                    # Step 3: Add captions with Captacity
-                    st.write(f"Adding captions to chunk {idx + 1}...")
-                    captioned_chunk_path = f"output_with_captions_chunk_{idx}.mp4"
-                    captacity.add_captions(
-                        video_file=chunk_path,
-                        output_file=captioned_chunk_path,
-                    )
-
-                    # Step 4: Download the video chunk with captions
-                    with open(captioned_chunk_path, "rb") as video_file:
-                        video_bytes = video_file.read()
-                        st.download_button(
-                            f"Download Chunk {idx + 1}", 
-                            video_bytes, 
-                            file_name=f"video_chunk_{idx + 1}.mp4", 
-                            mime="video/mp4"
-                        )
+                # Step 4: Download the video with captions
+                st.write("Video generation complete!")
+                with open(captioned_video_path, "rb") as video_file:
+                    video_bytes = video_file.read()
+                    st.download_button("Download Video", video_bytes, file_name="final_video_with_captions.mp4", mime="video/mp4")
 
             except Exception as e:
                 st.error(f"Failed to create the final video: {e}")
