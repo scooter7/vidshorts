@@ -30,7 +30,9 @@ def add_text_overlay(image_path, text, output_path, font_path):
         font = ImageFont.truetype(font_path, size=30)
 
         # Calculate text size and position
-        text_width, text_height = font.getsize(text)
+        text_bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
         position = ((img.width - text_width) // 2, img.height - text_height - 20)
 
         # Create a semi-transparent rectangle behind the text
