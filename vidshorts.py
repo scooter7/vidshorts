@@ -19,30 +19,60 @@ def compress_image(image_path, output_path, quality=50):
         img.save(output_path, "JPEG", quality=quality)
 
 # Add text overlay using Pillow
-def add_text_overlay(image_path, text, output_path):
+def add_text_overlay(image_path, text, output_path, font_path):
     """Add captions to an image using Pillow."""
     try:
-        img = Image.open(image_path)
+        # Open the image
+        img = Image.open(image_path).convert("RGBA")
         draw = ImageDraw.Draw(img)
 
-        # Define font (ensure the font file exists in your environment)
-        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Adjust this path if necessary
+        # Define font
         font = ImageFont.truetype(font_path, size=30)
 
-        # Calculate text position
-        text_width, text_height = draw.textsize(text, font=font)
+        # Calculate text size and position
+        text_width, text_height = font.getsize(text)
         position = ((img.width - text_width) // 2, img.height - text_height - 20)
 
-        # Draw text with black background for better visibility
-        text_bg = Image.new("RGBA", (text_width + 20, text_height + 10), (0, 0, 0, 128))
-        img.paste(text_bg, (position[0] - 10, position[1] - 5), text_bg)
+        # Create a semi-transparent rectangle behind the text
+        overlay = Image.new("RGBA", img.size, (255, 255, 255, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
+        overlay_draw.rectangle(
+            [(position[0] - 10, position[1] - 5), (position[0] + text_width + 10, position[1] + text_height + 5)],
+            fill=(0, 0, 0, 128)
+        )
+
+        # Combine the overlay with the image
+        img = Image.alpha_composite(img, overlay)
+
+        # Draw the text
+        draw = ImageDraw.Draw(img)
         draw.text(position, text, font=font, fill="white")
 
-        # Save the output image
-        img.save(output_path)
+        # Save the final image
+        img.convert("RGB").save(output_path, "JPEG")
     except Exception as e:
         st.error(f"Failed to add text overlay: {e}")
         raise e
+
+# Download font file
+def download_font(font_url, local_path):
+    if not os.path.exists(local_path):
+        try:
+            response = requests.get(font_url)
+            response.raise_for_status()
+            with open(local_path, "wb") as f:
+                f.write(response.content)
+            st.info("Font file downloaded successfully.")
+        except Exception as e:
+            st.error(f"Failed to download font file: {e}")
+            raise e
+
+# Font file URL and local path
+font_url = "https://github.com/scooter7/vidshorts/blob/main/Arial.ttf"
+local_font_path = "Arial.ttf"
+
+# Download the font file
+download_font(font_url, local_font_path)
 
 # App title and description
 st.title("Storytelling Video Creator")
@@ -130,7 +160,7 @@ if "script" in st.session_state and st.session_state.script:
 
                 # Add text overlay (captions) to image
                 captioned_image_path = f"images/captioned_image_{idx}.jpg"
-                add_text_overlay(image_filename, sentence, captioned_image_path)
+                add_text_overlay(image_filename, sentence, captioned_image_path, local_font_path)
             except Exception as e:
                 st.warning(f"Image generation failed for sentence {idx + 1}. Error: {e}")
                 if placeholder_path:
