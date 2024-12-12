@@ -19,35 +19,52 @@ def compress_image(image_path, output_path, quality=50):
         img.save(output_path, "JPEG", quality=quality)
 
 # Add text overlay using Pillow
+import textwrap
+
 def add_text_overlay(image_path, text, output_path, font_path):
-    """Add captions to an image using Pillow."""
+    """Add captions to an image using Pillow with text wrapping and debugging."""
     try:
+        # Open the image
         img = Image.open(image_path).convert("RGBA")
         draw = ImageDraw.Draw(img)
 
+        # Load font
         font = ImageFont.truetype(font_path, size=30)
 
+        # Calculate maximum text width (pixels) for wrapping
+        max_text_width = img.width - 40  # Padding of 20px on each side
+        wrapped_text = textwrap.fill(text, width=40)  # Approx. 40 chars per line
+
         # Calculate text size and position
-        text_bbox = draw.textbbox((0, 0), text, font=font)
+        text_bbox = draw.textbbox((0, 0), wrapped_text, font=font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
-        position = ((img.width - text_width) // 2, img.height - text_height - 20)
+        total_text_height = text_height + 20  # Add padding
 
-        # Create a semi-transparent rectangle behind the text
-        overlay = Image.new("RGBA", img.size, (255, 255, 255, 0))
-        overlay_draw = ImageDraw.Draw(overlay)
-        overlay_draw.rectangle(
-            [(position[0] - 10, position[1] - 5), (position[0] + text_width + 10, position[1] + text_height + 5)],
+        # Position the text at the bottom of the image
+        x_start = 20  # 20px padding from left
+        y_start = img.height - total_text_height - 20  # 20px padding from bottom
+
+        # Create semi-transparent rectangle for text background
+        background = Image.new("RGBA", img.size, (255, 255, 255, 0))
+        background_draw = ImageDraw.Draw(background)
+        background_draw.rectangle(
+            [(x_start - 10, y_start - 10), (x_start + text_width + 10, y_start + total_text_height + 10)],
             fill=(0, 0, 0, 128)
         )
 
-        img = Image.alpha_composite(img, overlay)
+        # Combine overlay and original image
+        img = Image.alpha_composite(img, background)
 
         # Draw the text
         draw = ImageDraw.Draw(img)
-        draw.text(position, text, font=font, fill="white")
+        draw.text((x_start, y_start), wrapped_text, font=font, fill="white")
 
+        # Save the final image
         img.convert("RGB").save(output_path, "JPEG")
+
+        st.info(f"Text overlay added successfully: {output_path}")
+
     except Exception as e:
         st.error(f"Failed to add text overlay: {e}")
         raise e
