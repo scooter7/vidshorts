@@ -19,6 +19,17 @@ def compress_image(image_path, output_path, quality=50):
     with Image.open(image_path) as img:
         img.save(output_path, "JPEG", quality=quality)
 
+# Add captions using Captacity
+def add_captions_to_video(video_file, output_file):
+    try:
+        captacity.add_captions(
+            video_file=video_file,
+            output_file=output_file,
+        )
+    except Exception as e:
+        st.error(f"Failed to add captions: {e}")
+        raise e
+
 # App title and description
 st.title("Storytelling Video Creator")
 st.write("Generate videos with a limit of 15 or 30 seconds.")
@@ -153,13 +164,8 @@ if st.session_state.script:
                 st.write("Adding captions...")
                 captioned_video_path = "output_with_captions.mp4"
                 try:
-                    captacity.add_captions(
-                        video_file=final_video_path,
-                        output_file=captioned_video_path,
-                        use_local_whisper=False
-                    )
-                except Exception as e:
-                    st.error(f"Failed to add captions: {e}")
+                    add_captions_to_video(final_video_path, captioned_video_path)
+                except Exception:
                     captioned_video_path = final_video_path  # Use the video without captions
 
                 # Download video
