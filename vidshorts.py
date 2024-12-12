@@ -155,7 +155,8 @@ if st.session_state.script:
                 try:
                     captacity.add_captions(
                         video_file=final_video_path,
-                        output_file=captioned_video_path
+                        output_file=captioned_video_path,
+                        use_local_whisper=False
                     )
                 except Exception as e:
                     st.error(f"Failed to add captions: {e}")
