@@ -7,7 +7,7 @@ import requests
 import os
 import captacity
 
-# Set the OpenAI API key as an environment variable and initialize the client
+# Set OpenAI API key as environment variable and initialize the client
 os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -125,9 +125,8 @@ if st.session_state.script:
                 )
                 audio_filename = f"audio/audio_{idx}.mp3"
                 with open(audio_filename, "wb") as f:
-                    for chunk in audio:
+                    for chunk in audio:  # Ensure chunks are properly handled
                         f.write(chunk)
-
             except Exception as e:
                 st.error(f"Audio generation failed for sentence {idx + 1}. Error: {e}")
                 continue
@@ -153,10 +152,14 @@ if st.session_state.script:
                 # Add captions with Captacity
                 st.write("Adding captions...")
                 captioned_video_path = "output_with_captions.mp4"
-                captacity.add_captions(
-                    video_file=final_video_path,
-                    output_file=captioned_video_path,
-                )
+                try:
+                    captacity.add_captions(
+                        video_file=final_video_path,
+                        output_file=captioned_video_path
+                    )
+                except Exception as e:
+                    st.error(f"Failed to add captions: {e}")
+                    captioned_video_path = final_video_path  # Use the video without captions
 
                 # Download video
                 st.write("Video generation complete!")
