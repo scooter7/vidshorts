@@ -7,9 +7,8 @@ import requests
 import os
 import captacity
 
-# Set OpenAI API key directly during client initialization
-openai_api_key = st.secrets["openai_api_key"]
-client = OpenAI(api_key=openai_api_key)
+# Initialize OpenAI client explicitly with the API key from Streamlit secrets
+client = OpenAI(api_key=st.secrets["openai_api_key"])
 
 # Set ElevenLabs API key from Streamlit secrets
 elevenlabs_client = ElevenLabs(api_key=st.secrets["elevenlabs_api_key"])
