@@ -44,7 +44,7 @@ if topic and st.button("Generate Script"):
     # Generate story script using OpenAI GPT-4
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[{"role": "user", "content": prompt}]
         )
         st.session_state.script = response.choices[0].message.content
