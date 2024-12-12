@@ -18,28 +18,9 @@ def compress_image(image_path, output_path, quality=50):
     with Image.open(image_path) as img:
         img.save(output_path, "JPEG", quality=quality)
 
-# Split video clips into smaller chunks
-def split_video_clips(video_clips, max_duration=60):
-    chunks = []
-    current_chunk = []
-    current_duration = 0
-
-    for clip in video_clips:
-        if current_duration + clip.duration > max_duration:
-            chunks.append(concatenate_videoclips(current_chunk, method="compose"))
-            current_chunk = []
-            current_duration = 0
-        current_chunk.append(clip)
-        current_duration += clip.duration
-
-    if current_chunk:
-        chunks.append(concatenate_videoclips(current_chunk, method="compose"))
-
-    return chunks
-
 # App title and description
 st.title("Storytelling Video Creator")
-st.write("Generate videos with images, narration, and captions from your topic.")
+st.write("Generate videos with a limit of 15 or 30 seconds.")
 
 # Initialize session state for the script
 if "script" not in st.session_state:
@@ -60,11 +41,22 @@ if not os.path.exists(placeholder_path):
         st.error(f"Failed to download placeholder image: {e}")
         placeholder_path = None  # Disable fallback if download fails
 
-# Input: Topic
+# Step 1: User Input - Topic and Duration
 topic = st.text_input("Enter the topic for your video:")
-if topic and st.button("Generate Script"):
+duration_choice = st.radio("Select the desired video length:", ["15 seconds", "30 seconds"])
+
+if topic and duration_choice and st.button("Generate Script"):
     st.write("Generating story script...")
-    prompt = f"Write a short story about the topic: {topic}. Make it engaging, concise, and suitable for a video."
+    
+    # Set word limit based on duration choice
+    if duration_choice == "15 seconds":
+        word_limit = 30  # Approx. 2 words/sec * 15 seconds
+    else:
+        word_limit = 60  # Approx. 2 words/sec * 30 seconds
+
+    # Modify the prompt for GPT-4
+    prompt = (f"Write a short story about the topic '{topic}' in no more than {word_limit} words. "
+              f"Make it engaging, concise, and suitable for a video narration of {duration_choice}.")
 
     # Generate story script using OpenAI GPT-4
     try:
@@ -90,7 +82,7 @@ if st.session_state.script:
     if st.button("Generate Video"):
         st.write("Processing...")
 
-        # Step 1: Split script into sentences
+        # Step 2: Split script into sentences
         sentences = story_script.split(". ")
         video_clips = []
         os.makedirs("images", exist_ok=True)
@@ -152,31 +144,35 @@ if st.session_state.script:
                 st.error(f"Failed to combine image and audio: {e}")
                 continue
 
-        # Step 2: Combine video clips
+        # Step 3: Combine video clips
         if video_clips:
             st.write("Combining all video clips...")
             try:
-                # Split into chunks if necessary
-                video_chunks = split_video_clips(video_clips, max_duration=60)
-                chunk_paths = []
+                final_video = concatenate_videoclips(video_clips, method="compose")
 
-                for i, chunk in enumerate(video_chunks):
-                    chunk_path = f"chunk_{i}.mp4"
-                    chunk.write_videofile(
-                        chunk_path,
-                        codec="libx264",
-                        audio_codec="aac",
-                        fps=24,
-                        bitrate="200k"  # Reduced bitrate
-                    )
-                    chunk_paths.append(chunk_path)
+                # Save final video
+                final_video_path = "final_video.mp4"
+                final_video.write_videofile(
+                    final_video_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    fps=24,
+                    bitrate="500k"  # Reduced bitrate
+                )
 
-                # Allow download of each chunk
-                for i, chunk_path in enumerate(chunk_paths):
-                    st.write(f"Video chunk {i + 1} ready for download.")
-                    with open(chunk_path, "rb") as video_file:
-                        video_bytes = video_file.read()
-                        st.download_button(f"Download Video Chunk {i + 1}", video_bytes, file_name=f"video_chunk_{i + 1}.mp4", mime="video/mp4")
+                # Step 4: Add captions with Captacity
+                st.write("Adding captions...")
+                captioned_video_path = "output_with_captions.mp4"
+                captacity.add_captions(
+                    video_file=final_video_path,
+                    output_file=captioned_video_path,
+                )
+
+                # Step 5: Download the video with captions
+                st.write("Video generation complete!")
+                with open(captioned_video_path, "rb") as video_file:
+                    video_bytes = video_file.read()
+                    st.download_button("Download Video", video_bytes, file_name="final_video_with_captions.mp4", mime="video/mp4")
 
             except Exception as e:
                 st.error(f"Failed to create the final video: {e}")
