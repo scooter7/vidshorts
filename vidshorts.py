@@ -1,12 +1,12 @@
 import streamlit as st
 from openai import OpenAI
 from elevenlabs import ElevenLabs
-from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, TextClip, CompositeVideoClip
-from PIL import Image
+from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, CompositeVideoClip
+from PIL import Image, ImageDraw, ImageFont
 import requests
 import os
 
-# Set OpenAI API key as environment variable and initialize the client
+# Set OpenAI API key and initialize the client
 os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -18,26 +18,35 @@ def compress_image(image_path, output_path, quality=50):
     with Image.open(image_path) as img:
         img.save(output_path, "JPEG", quality=quality)
 
-# Add captions using MoviePy
-def add_captions(image_clip, text, duration):
-    """Overlay captions on a video clip."""
-    caption = TextClip(
-        text,
-        fontsize=24,
-        color="white",
-        bg_color="black",
-        size=(image_clip.w, 50),  # Width matches video, height is fixed
-        align="center"
-    ).set_duration(duration).set_position(("center", "bottom"))
-    return CompositeVideoClip([image_clip, caption])
+# Add text overlay using Pillow
+def add_text_overlay(image_path, text, output_path):
+    """Add captions to an image using Pillow."""
+    try:
+        img = Image.open(image_path)
+        draw = ImageDraw.Draw(img)
+
+        # Define font (ensure the font file exists in your environment)
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Adjust this path if necessary
+        font = ImageFont.truetype(font_path, size=30)
+
+        # Calculate text position
+        text_width, text_height = draw.textsize(text, font=font)
+        position = ((img.width - text_width) // 2, img.height - text_height - 20)
+
+        # Draw text with black background for better visibility
+        text_bg = Image.new("RGBA", (text_width + 20, text_height + 10), (0, 0, 0, 128))
+        img.paste(text_bg, (position[0] - 10, position[1] - 5), text_bg)
+        draw.text(position, text, font=font, fill="white")
+
+        # Save the output image
+        img.save(output_path)
+    except Exception as e:
+        st.error(f"Failed to add text overlay: {e}")
+        raise e
 
 # App title and description
 st.title("Storytelling Video Creator")
-st.write("Generate videos with captions using MoviePy.")
-
-# Initialize session state for the script
-if "script" not in st.session_state:
-    st.session_state.script = ""
+st.write("Generate videos with captions using Pillow.")
 
 # Placeholder image setup
 placeholder_url = "https://raw.githubusercontent.com/scooter7/vidshorts/main/placeholder.jpg"
@@ -52,7 +61,7 @@ if not os.path.exists(placeholder_path):
         st.info("Downloaded placeholder image successfully.")
     except Exception as e:
         st.error(f"Failed to download placeholder image: {e}")
-        placeholder_path = None  # Disable fallback if download fails
+        placeholder_path = None
 
 # Step 1: User Input - Topic and Duration
 topic = st.text_input("Enter the topic for your video:")
@@ -60,7 +69,7 @@ duration_choice = st.radio("Select the desired video length:", ["15 seconds", "3
 
 if topic and duration_choice and st.button("Generate Script"):
     st.write("Generating story script...")
-    
+
     # Set word limit based on duration choice
     word_limit = 30 if duration_choice == "15 seconds" else 60
 
@@ -74,12 +83,13 @@ if topic and duration_choice and st.button("Generate Script"):
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}]
         )
-        st.session_state.script = response.choices[0].message.content
+        story_script = response.choices[0].message.content
+        st.session_state.script = story_script
     except Exception as e:
         st.error(f"Failed to generate script: {e}")
 
 # Display the generated script if available
-if st.session_state.script:
+if "script" in st.session_state and st.session_state.script:
     st.write("Generated Script:")
     story_script = st.text_area(
         "Story Script",
@@ -118,10 +128,13 @@ if st.session_state.script:
                     f.write(image_data)
                 compress_image(image_filename, image_filename, quality=50)
 
+                # Add text overlay (captions) to image
+                captioned_image_path = f"images/captioned_image_{idx}.jpg"
+                add_text_overlay(image_filename, sentence, captioned_image_path)
             except Exception as e:
                 st.warning(f"Image generation failed for sentence {idx + 1}. Error: {e}")
                 if placeholder_path:
-                    image_filename = placeholder_path
+                    captioned_image_path = placeholder_path
                 else:
                     st.error("No placeholder available. Skipping this frame.")
                     continue
@@ -137,7 +150,7 @@ if st.session_state.script:
                 )
                 audio_filename = f"audio/audio_{idx}.mp3"
                 with open(audio_filename, "wb") as f:
-                    for chunk in audio:  # Ensure chunks are properly handled
+                    for chunk in audio:
                         f.write(chunk)
             except Exception as e:
                 st.error(f"Audio generation failed for sentence {idx + 1}. Error: {e}")
@@ -147,9 +160,8 @@ if st.session_state.script:
             st.write(f"Combining image and audio for sentence {idx + 1}...")
             try:
                 audio_clip = AudioFileClip(audio_filename)
-                image_clip = ImageClip(image_filename, duration=audio_clip.duration).set_audio(audio_clip)
-                image_with_captions = add_captions(image_clip, sentence, audio_clip.duration)
-                video_clips.append(image_with_captions.set_fps(30))
+                image_clip = ImageClip(captioned_image_path, duration=audio_clip.duration).set_audio(audio_clip)
+                video_clips.append(image_clip.set_fps(30))
             except Exception as e:
                 st.error(f"Failed to combine image and audio: {e}")
                 continue
@@ -167,7 +179,6 @@ if st.session_state.script:
                 with open(final_video_path, "rb") as video_file:
                     video_bytes = video_file.read()
                     st.download_button("Download Video", video_bytes, file_name="final_video.mp4", mime="video/mp4")
-
             except Exception as e:
                 st.error(f"Failed to create the final video: {e}")
         else:
