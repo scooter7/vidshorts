@@ -1,16 +1,17 @@
 import streamlit as st
 from openai import OpenAI
 from elevenlabs import ElevenLabs
-from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, CompositeVideoClip
+from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip
 from PIL import Image
 import requests
 import os
 import captacity
 
-# Initialize OpenAI client explicitly with the API key from Streamlit secrets
-client = OpenAI(api_key=st.secrets["openai_api_key"])
+# Set the OpenAI API key as an environment variable and initialize the client
+os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Set ElevenLabs API key from Streamlit secrets
+# Initialize ElevenLabs client
 elevenlabs_client = ElevenLabs(api_key=st.secrets["elevenlabs_api_key"])
 
 # Compress images before adding to video
@@ -49,16 +50,13 @@ if topic and duration_choice and st.button("Generate Script"):
     st.write("Generating story script...")
     
     # Set word limit based on duration choice
-    if duration_choice == "15 seconds":
-        word_limit = 30  # Approx. 2 words/sec * 15 seconds
-    else:
-        word_limit = 60  # Approx. 2 words/sec * 30 seconds
+    word_limit = 30 if duration_choice == "15 seconds" else 60
 
-    # Modify the prompt for GPT-4
+    # Generate script prompt
     prompt = (f"Write a short story about the topic '{topic}' in no more than {word_limit} words. "
               f"Make it engaging, concise, and suitable for a video narration of {duration_choice}.")
 
-    # Generate story script using OpenAI GPT-4
+    # Generate story script
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -82,7 +80,7 @@ if st.session_state.script:
     if st.button("Generate Video"):
         st.write("Processing...")
 
-        # Step 2: Split script into sentences
+        # Split script into sentences
         sentences = story_script.split(". ")
         video_clips = []
         os.makedirs("images", exist_ok=True)
@@ -144,23 +142,15 @@ if st.session_state.script:
                 st.error(f"Failed to combine image and audio: {e}")
                 continue
 
-        # Step 3: Combine video clips
+        # Combine video clips
         if video_clips:
             st.write("Combining all video clips...")
             try:
                 final_video = concatenate_videoclips(video_clips, method="compose")
-
-                # Save final video
                 final_video_path = "final_video.mp4"
-                final_video.write_videofile(
-                    final_video_path,
-                    codec="libx264",
-                    audio_codec="aac",
-                    fps=24,
-                    bitrate="500k"  # Reduced bitrate
-                )
+                final_video.write_videofile(final_video_path, codec="libx264", audio_codec="aac", fps=24)
 
-                # Step 4: Add captions with Captacity
+                # Add captions with Captacity
                 st.write("Adding captions...")
                 captioned_video_path = "output_with_captions.mp4"
                 captacity.add_captions(
@@ -168,7 +158,7 @@ if st.session_state.script:
                     output_file=captioned_video_path,
                 )
 
-                # Step 5: Download the video with captions
+                # Download video
                 st.write("Video generation complete!")
                 with open(captioned_video_path, "rb") as video_file:
                     video_bytes = video_file.read()
