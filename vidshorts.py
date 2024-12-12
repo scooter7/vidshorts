@@ -22,11 +22,9 @@ def compress_image(image_path, output_path, quality=50):
 def add_text_overlay(image_path, text, output_path, font_path):
     """Add captions to an image using Pillow."""
     try:
-        # Open the image
         img = Image.open(image_path).convert("RGBA")
         draw = ImageDraw.Draw(img)
 
-        # Define font
         font = ImageFont.truetype(font_path, size=30)
 
         # Calculate text size and position
@@ -43,14 +41,12 @@ def add_text_overlay(image_path, text, output_path, font_path):
             fill=(0, 0, 0, 128)
         )
 
-        # Combine the overlay with the image
         img = Image.alpha_composite(img, overlay)
 
         # Draw the text
         draw = ImageDraw.Draw(img)
         draw.text(position, text, font=font, fill="white")
 
-        # Save the final image
         img.convert("RGB").save(output_path, "JPEG")
     except Exception as e:
         st.error(f"Failed to add text overlay: {e}")
@@ -72,19 +68,15 @@ def download_font(font_url, local_path):
 # Font file URL and local path
 font_url = "https://github.com/scooter7/vidshorts/blob/main/Arial.ttf"
 local_font_path = "Arial.ttf"
-
-# Download the font file
 download_font(font_url, local_font_path)
 
 # App title and description
-st.title("Storytelling Video Creator")
-st.write("Generate videos with captions using Pillow.")
+st.title("Storytelling Video Creator with Styles")
+st.write("Generate videos with captions and select your desired image style.")
 
 # Placeholder image setup
 placeholder_url = "https://raw.githubusercontent.com/scooter7/vidshorts/main/placeholder.jpg"
 placeholder_path = "placeholder.jpg"
-
-# Ensure the placeholder image exists locally
 if not os.path.exists(placeholder_path):
     try:
         placeholder_image_data = requests.get(placeholder_url).content
@@ -95,21 +87,20 @@ if not os.path.exists(placeholder_path):
         st.error(f"Failed to download placeholder image: {e}")
         placeholder_path = None
 
-# Step 1: User Input - Topic and Duration
+# Step 1: User Input - Topic, Duration, and Style
 topic = st.text_input("Enter the topic for your video:")
 duration_choice = st.radio("Select the desired video length:", ["15 seconds", "30 seconds"])
+style_choice = st.selectbox(
+    "Choose an image style for the video:",
+    ["Realistic", "Oil Painting", "Watercolor", "Sketch", "Fantasy Art", "3D Render"]
+)
 
-if topic and duration_choice and st.button("Generate Script"):
+if topic and duration_choice and style_choice and st.button("Generate Script"):
     st.write("Generating story script...")
 
-    # Set word limit based on duration choice
     word_limit = 30 if duration_choice == "15 seconds" else 60
-
-    # Generate script prompt
     prompt = (f"Write a short story about the topic '{topic}' in no more than {word_limit} words. "
               f"Make it engaging, concise, and suitable for a video narration of {duration_choice}.")
-
-    # Generate story script
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -120,30 +111,21 @@ if topic and duration_choice and st.button("Generate Script"):
     except Exception as e:
         st.error(f"Failed to generate script: {e}")
 
-# Display the generated script if available
 if "script" in st.session_state and st.session_state.script:
     st.write("Generated Script:")
-    story_script = st.text_area(
-        "Story Script",
-        st.session_state.script,
-        height=200,
-        key="story_script"
-    )
+    story_script = st.text_area("Story Script", st.session_state.script, height=200, key="story_script")
 
-    # Allow editing of the generated script
     if st.button("Generate Video"):
         st.write("Processing...")
 
-        # Split script into sentences
         sentences = story_script.split(". ")
         video_clips = []
         os.makedirs("images", exist_ok=True)
         os.makedirs("audio", exist_ok=True)
 
         for idx, sentence in enumerate(sentences):
-            # Generate image using DALL-E 3
             st.write(f"Generating image for sentence {idx + 1}...")
-            image_prompt = f"A visually engaging representation of: {sentence}"
+            image_prompt = f"{sentence} in {style_choice.lower()} style"
 
             try:
                 response = client.images.generate(
@@ -159,8 +141,6 @@ if "script" in st.session_state and st.session_state.script:
                 with open(image_filename, "wb") as f:
                     f.write(image_data)
                 compress_image(image_filename, image_filename, quality=50)
-
-                # Add text overlay (captions) to image
                 captioned_image_path = f"images/captioned_image_{idx}.jpg"
                 add_text_overlay(image_filename, sentence, captioned_image_path, local_font_path)
             except Exception as e:
@@ -171,7 +151,6 @@ if "script" in st.session_state and st.session_state.script:
                     st.error("No placeholder available. Skipping this frame.")
                     continue
 
-            # Generate audio
             st.write(f"Generating audio for sentence {idx + 1}...")
             try:
                 audio = elevenlabs_client.text_to_speech.convert(
@@ -188,7 +167,6 @@ if "script" in st.session_state and st.session_state.script:
                 st.error(f"Audio generation failed for sentence {idx + 1}. Error: {e}")
                 continue
 
-            # Combine image and audio
             st.write(f"Combining image and audio for sentence {idx + 1}...")
             try:
                 audio_clip = AudioFileClip(audio_filename)
@@ -198,15 +176,12 @@ if "script" in st.session_state and st.session_state.script:
                 st.error(f"Failed to combine image and audio: {e}")
                 continue
 
-        # Combine video clips
         if video_clips:
             st.write("Combining all video clips...")
             try:
                 final_video = concatenate_videoclips(video_clips, method="compose")
                 final_video_path = "final_video.mp4"
                 final_video.write_videofile(final_video_path, codec="libx264", audio_codec="aac", fps=24)
-
-                # Download video
                 st.write("Video generation complete!")
                 with open(final_video_path, "rb") as video_file:
                     video_bytes = video_file.read()
