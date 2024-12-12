@@ -2,6 +2,7 @@ import streamlit as st
 from openai import OpenAI
 from elevenlabs import ElevenLabs
 from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, CompositeVideoClip
+from PIL import Image
 import requests
 import os
 import captacity
@@ -11,6 +12,30 @@ client = OpenAI(api_key=st.secrets["openai_api_key"])
 
 # Set ElevenLabs API key from Streamlit secrets
 elevenlabs_client = ElevenLabs(api_key=st.secrets["elevenlabs_api_key"])
+
+# Compress images before adding to video
+def compress_image(image_path, output_path, quality=50):
+    with Image.open(image_path) as img:
+        img.save(output_path, "JPEG", quality=quality)
+
+# Split video clips into smaller chunks
+def split_video_clips(video_clips, max_duration=60):
+    chunks = []
+    current_chunk = []
+    current_duration = 0
+
+    for clip in video_clips:
+        if current_duration + clip.duration > max_duration:
+            chunks.append(concatenate_videoclips(current_chunk, method="compose"))
+            current_chunk = []
+            current_duration = 0
+        current_chunk.append(clip)
+        current_duration += clip.duration
+
+    if current_chunk:
+        chunks.append(concatenate_videoclips(current_chunk, method="compose"))
+
+    return chunks
 
 # App title and description
 st.title("Storytelling Video Creator")
@@ -71,35 +96,30 @@ if st.session_state.script:
         os.makedirs("images", exist_ok=True)
         os.makedirs("audio", exist_ok=True)
 
-        @st.cache
-        def generate_image_cached(prompt):
-            response = client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                size="1024x1024",  # Supported size
-                quality="standard",
-                n=1
-            )
-            return response.data[0].url
-
         for idx, sentence in enumerate(sentences):
             # Generate image using DALL-E 3
             st.write(f"Generating image for sentence {idx + 1}...")
             image_prompt = f"A visually engaging representation of: {sentence}"
 
             try:
-                image_url = generate_image_cached(image_prompt)
-
-                # Download the image from the URL
+                response = client.images.generate(
+                    model="dall-e-3",
+                    prompt=image_prompt,
+                    size="512x512",
+                    quality="standard",
+                    n=1
+                )
+                image_url = response.data[0].url
                 image_filename = f"images/image_{idx}.jpg"
                 image_data = requests.get(image_url).content
                 with open(image_filename, "wb") as f:
                     f.write(image_data)
+                compress_image(image_filename, image_filename, quality=50)
 
             except Exception as e:
                 st.warning(f"Image generation failed for sentence {idx + 1}. Error: {e}")
                 if placeholder_path:
-                    image_filename = placeholder_path  # Use the placeholder image
+                    image_filename = placeholder_path
                 else:
                     st.error("No placeholder available. Skipping this frame.")
                     continue
@@ -136,31 +156,27 @@ if st.session_state.script:
         if video_clips:
             st.write("Combining all video clips...")
             try:
-                final_video = concatenate_videoclips(video_clips, method="compose")
+                # Split into chunks if necessary
+                video_chunks = split_video_clips(video_clips, max_duration=60)
+                chunk_paths = []
 
-                # Save final video
-                final_video_path = "final_video.mp4"
-                final_video.write_videofile(
-                    final_video_path,
-                    codec="libx264",
-                    audio_codec="aac",
-                    fps=24,
-                    bitrate="500k"  # Adjust bitrate for compression
-                )
+                for i, chunk in enumerate(video_chunks):
+                    chunk_path = f"chunk_{i}.mp4"
+                    chunk.write_videofile(
+                        chunk_path,
+                        codec="libx264",
+                        audio_codec="aac",
+                        fps=24,
+                        bitrate="200k"  # Reduced bitrate
+                    )
+                    chunk_paths.append(chunk_path)
 
-                # Step 3: Add captions with Captacity
-                st.write("Adding captions...")
-                captioned_video_path = "output_with_captions.mp4"
-                captacity.add_captions(
-                    video_file=final_video_path,
-                    output_file=captioned_video_path,
-                )
-
-                # Step 4: Download the video with captions
-                st.write("Video generation complete!")
-                with open(captioned_video_path, "rb") as video_file:
-                    video_bytes = video_file.read()
-                    st.download_button("Download Video", video_bytes, file_name="final_video_with_captions.mp4", mime="video/mp4")
+                # Allow download of each chunk
+                for i, chunk_path in enumerate(chunk_paths):
+                    st.write(f"Video chunk {i + 1} ready for download.")
+                    with open(chunk_path, "rb") as video_file:
+                        video_bytes = video_file.read()
+                        st.download_button(f"Download Video Chunk {i + 1}", video_bytes, file_name=f"video_chunk_{i + 1}.mp4", mime="video/mp4")
 
             except Exception as e:
                 st.error(f"Failed to create the final video: {e}")
