@@ -1,11 +1,10 @@
 import streamlit as st
 from openai import OpenAI
 from elevenlabs import ElevenLabs
-from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip
+from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, TextClip, CompositeVideoClip
 from PIL import Image
 import requests
 import os
-import captacity
 
 # Set OpenAI API key as environment variable and initialize the client
 os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
@@ -19,20 +18,22 @@ def compress_image(image_path, output_path, quality=50):
     with Image.open(image_path) as img:
         img.save(output_path, "JPEG", quality=quality)
 
-# Add captions using Captacity
-def add_captions_to_video(video_file, output_file):
-    try:
-        captacity.add_captions(
-            video_file=video_file,
-            output_file=output_file,
-        )
-    except Exception as e:
-        st.error(f"Failed to add captions: {e}")
-        raise e
+# Add captions using MoviePy
+def add_captions(image_clip, text, duration):
+    """Overlay captions on a video clip."""
+    caption = TextClip(
+        text,
+        fontsize=24,
+        color="white",
+        bg_color="black",
+        size=(image_clip.w, 50),  # Width matches video, height is fixed
+        align="center"
+    ).set_duration(duration).set_position(("center", "bottom"))
+    return CompositeVideoClip([image_clip, caption])
 
 # App title and description
 st.title("Storytelling Video Creator")
-st.write("Generate videos with a limit of 15 or 30 seconds.")
+st.write("Generate videos with captions using MoviePy.")
 
 # Initialize session state for the script
 if "script" not in st.session_state:
@@ -147,7 +148,8 @@ if st.session_state.script:
             try:
                 audio_clip = AudioFileClip(audio_filename)
                 image_clip = ImageClip(image_filename, duration=audio_clip.duration).set_audio(audio_clip)
-                video_clips.append(image_clip.set_fps(30))
+                image_with_captions = add_captions(image_clip, sentence, audio_clip.duration)
+                video_clips.append(image_with_captions.set_fps(30))
             except Exception as e:
                 st.error(f"Failed to combine image and audio: {e}")
                 continue
@@ -160,19 +162,11 @@ if st.session_state.script:
                 final_video_path = "final_video.mp4"
                 final_video.write_videofile(final_video_path, codec="libx264", audio_codec="aac", fps=24)
 
-                # Add captions with Captacity
-                st.write("Adding captions...")
-                captioned_video_path = "output_with_captions.mp4"
-                try:
-                    add_captions_to_video(final_video_path, captioned_video_path)
-                except Exception:
-                    captioned_video_path = final_video_path  # Use the video without captions
-
                 # Download video
                 st.write("Video generation complete!")
-                with open(captioned_video_path, "rb") as video_file:
+                with open(final_video_path, "rb") as video_file:
                     video_bytes = video_file.read()
-                    st.download_button("Download Video", video_bytes, file_name="final_video_with_captions.mp4", mime="video/mp4")
+                    st.download_button("Download Video", video_bytes, file_name="final_video.mp4", mime="video/mp4")
 
             except Exception as e:
                 st.error(f"Failed to create the final video: {e}")
