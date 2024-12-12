@@ -61,7 +61,7 @@ if st.session_state.script:
             response = client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
-                size="1024x1024",
+                size="512x512",  # Reduced size to lower final video resolution
                 quality="standard",
                 n=1
             )
@@ -117,23 +117,42 @@ if st.session_state.script:
         if video_clips:
             st.write("Combining all video clips...")
             try:
-                final_video_path = "final_video.mp4"
                 final_video = concatenate_videoclips(video_clips, method="compose")
-                final_video.write_videofile(final_video_path, codec="libx264", audio_codec="aac", fps=30)
 
-                # Step 3: Add captions with Captacity
-                st.write("Adding captions...")
-                captioned_video_path = "output_with_captions.mp4"
-                captacity.add_captions(
-                    video_file=final_video_path,
-                    output_file=captioned_video_path,
-                )
+                # Split video into chunks if size exceeds limits
+                chunk_duration = 120  # Split into 2-minute chunks
+                video_chunks = [
+                    final_video.subclip(i, min(i + chunk_duration, final_video.duration))
+                    for i in range(0, int(final_video.duration), chunk_duration)
+                ]
 
-                # Step 4: Download the video with captions
-                st.write("Video generation complete!")
-                with open(captioned_video_path, "rb") as video_file:
-                    video_bytes = video_file.read()
-                    st.download_button("Download Video", video_bytes, file_name="final_video_with_captions.mp4", mime="video/mp4")
+                for idx, chunk in enumerate(video_chunks):
+                    chunk_path = f"chunk_{idx}.mp4"
+                    chunk.write_videofile(
+                        chunk_path, 
+                        codec="libx264", 
+                        audio_codec="aac", 
+                        fps=24,  # Lower fps to reduce file size
+                        bitrate="500k"  # Adjust bitrate for compression
+                    )
+
+                    # Step 3: Add captions with Captacity
+                    st.write(f"Adding captions to chunk {idx + 1}...")
+                    captioned_chunk_path = f"output_with_captions_chunk_{idx}.mp4"
+                    captacity.add_captions(
+                        video_file=chunk_path,
+                        output_file=captioned_chunk_path,
+                    )
+
+                    # Step 4: Download the video chunk with captions
+                    with open(captioned_chunk_path, "rb") as video_file:
+                        video_bytes = video_file.read()
+                        st.download_button(
+                            f"Download Chunk {idx + 1}", 
+                            video_bytes, 
+                            file_name=f"video_chunk_{idx + 1}.mp4", 
+                            mime="video/mp4"
+                        )
 
             except Exception as e:
                 st.error(f"Failed to create the final video: {e}")
