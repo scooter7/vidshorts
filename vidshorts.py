@@ -6,13 +6,13 @@ from PIL import Image, ImageDraw, ImageFont
 import requests
 import os
 
- # Hide the Streamlit toolbar
- hide_toolbar_css = """
- <style>
-  .css-14xtw13.e8zbici0 { display: none !important; }
-  </style>
-  """
- st.markdown(hide_toolbar_css, unsafe_allow_html=True)
+# Hide the Streamlit toolbar
+hide_toolbar_css = """
+<style>
+.css-14xtw13.e8zbici0 { display: none !important; }
+</style>
+"""
+st.markdown(hide_toolbar_css, unsafe_allow_html=True)
 
 # Set OpenAI API key and initialize the client
 os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
