@@ -6,50 +6,13 @@ from PIL import Image, ImageDraw, ImageFont
 import requests
 import os
 
-st.markdown(
-    """
+ # Hide the Streamlit toolbar
+    hide_toolbar_css = """
     <style>
-    .st-emotion-cache-12fmjuu.ezrtsby2 {
-        display: none;
-    }
+        .css-14xtw13.e8zbici0 { display: none !important; }
     </style>
-    """,
-    unsafe_allow_html=True
-)
-
-st.markdown(
     """
-    <style>
-    .logo-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    .logo-container img {
-        width: 300px;
-    }
-    .app-container {
-        border-left: 5px solid #58258b;
-        border-right: 5px solid #58258b;
-        padding-left: 15px;
-        padding-right: 15px;
-    }
-    .stTextArea, .stTextInput, .stMultiSelect, .stSlider {
-        color: #42145f;
-    }
-    .stButton button {
-        background-color: #fec923;
-        color: #42145f;
-    }
-    .stButton button:hover {
-        background-color: #42145f;
-        color: #fec923;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+    st.markdown(hide_toolbar_css, unsafe_allow_html=True)
 
 # Set OpenAI API key and initialize the client
 os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
