@@ -6,6 +6,15 @@ from PIL import Image, ImageDraw, ImageFont
 import requests
 import os
 
+# Hide specific Streamlit elements
+hide_toolbar_css = """
+<style>
+.stAppHeader { display: none !important; }
+.st-emotion-cache-12fmjuu.e10jh26i0 { display: none !important; }
+</style>
+"""
+st.markdown(hide_toolbar_css, unsafe_allow_html=True)
+
 # Set OpenAI API key and initialize the client
 os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
