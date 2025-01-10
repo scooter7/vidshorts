@@ -73,7 +73,7 @@ def extract_text_from_document(file):
 # Font setup
 font_url = "https://github.com/scooter7/vidshorts/blob/main/Arial.ttf"
 local_font_path = "Arial.ttf"
-download_font(font_url, local_path)
+download_font(font_url, local_font_path)  # Use local_font_path instead of local_path
 
 # Placeholder image setup
 placeholder_url = "https://raw.githubusercontent.com/scooter7/vidshorts/main/placeholder.jpg"
