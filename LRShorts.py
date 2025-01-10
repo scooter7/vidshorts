@@ -27,6 +27,7 @@ def compress_image(image_path, output_path, quality=50):
     with Image.open(image_path) as img:
         img.save(output_path, "JPEG", quality=quality)
 
+
 def add_text_overlay(image_path, text, output_path, font_path):
     """
     Add captions to an image using Pillow.
@@ -72,12 +73,14 @@ def add_text_overlay(image_path, text, output_path, font_path):
     except Exception as e:
         raise RuntimeError(f"Error adding text overlay: {e}")
 
+
 def download_font(font_url, local_path):
     if not os.path.exists(local_path):
         response = requests.get(font_url)
         response.raise_for_status()
         with open(local_path, "wb") as f:
             f.write(response.content)
+
 
 def extract_text_from_document(file):
     if file.name.endswith(".pdf"):
@@ -92,6 +95,7 @@ def extract_text_from_document(file):
         st.error("Unsupported file type.")
         text = ""
     return text
+
 
 # Font setup
 font_url = "https://github.com/scooter7/vidshorts/blob/main/Arial.ttf"
@@ -172,23 +176,23 @@ if "script" in st.session_state and st.session_state.script:
             for idx, sentence in enumerate(sentences):
                 st.write(f"🔄 Processing frame {idx + 1}/{len(sentences)}...")
                 try:
-            # Generate image using DALL·E (latest version)
-            image_prompt = (
-                f"A visually stunning illustration of: {sentence}. "
-                f"Art style: {style_choice.lower()}. "
-                f"Add intricate details and vibrant colors for a 1024x1024 resolution."
-            )
-            response = client.images.generate(
-                prompt=image_prompt,
-                size="1024x1024",
-                quality="high",
-                n=1
-            )
-            image_url = response.data[0].url
-            image_filename = f"images/image_{idx}.jpg"
-            image_data = requests.get(image_url).content
-            with open(image_filename, "wb") as f:
-                f.write(image_data)
+                    # Generate image using DALL·E (latest version)
+                    image_prompt = (
+                        f"A visually stunning illustration of: {sentence}. "
+                        f"Art style: {style_choice.lower()}. "
+                        f"Add intricate details and vibrant colors for a 1024x1024 resolution."
+                    )
+                    response = client.images.generate(
+                        prompt=image_prompt,
+                        size="1024x1024",
+                        quality="high",
+                        n=1
+                    )
+                    image_url = response.data[0].url
+                    image_filename = f"images/image_{idx}.jpg"
+                    image_data = requests.get(image_url).content
+                    with open(image_filename, "wb") as f:
+                        f.write(image_data)
 
                     # Add text overlay
                     captioned_image_path = f"images/captioned_image_{idx}.jpg"
