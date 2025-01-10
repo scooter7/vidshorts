@@ -138,7 +138,7 @@ if "script" in st.session_state and st.session_state.script:
 
                 # Generate audio
                 audio = elevenlabs_client.text_to_speech.convert(
-                    voice_id="pqHfZKP75CvOlQylNhV4",
+                    voice_id="NYy9s57OPECPcDJavL3T",
                     model_id="eleven_multilingual_v2",
                     text=sentence,
                     voice_settings={"stability": 0.2, "similarity_boost": 0.8}
