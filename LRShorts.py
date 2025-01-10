@@ -185,7 +185,7 @@ if "script" in st.session_state and st.session_state.script:
                     response = client.images.generate(
                         prompt=image_prompt,
                         size="1024x1024",
-                        quality="high",
+                        quality="standard",
                         n=1
                     )
                     image_url = response.data[0].url
