@@ -135,11 +135,14 @@ if "summarized_topic" in st.session_state and st.session_state.summarized_topic:
             st.error(f"Failed to generate script: {e}")
 
 if "script" in st.session_state and st.session_state.script:
+    st.text_area("Generated Script", st.session_state.script, height=200)
+
     if st.button("Generate Video"):
         try:
             st.write("🎥 Starting video generation...")
             sentences = st.session_state.script.split(". ")
             video_clips = []
+            audio_files = []
             os.makedirs("images", exist_ok=True)
             os.makedirs("audio", exist_ok=True)
 
@@ -147,7 +150,6 @@ if "script" in st.session_state and st.session_state.script:
                 st.write(f"🔄 Processing frame {idx + 1}/{len(sentences)}...")
                 try:
                     # Generate image
-                    st.write(f"🖼️ Generating image for: '{sentence}'")
                     image_prompt = f"{sentence} in {style_choice.lower()} style"
                     response = client.images.generate(
                         model="dall-e-3",
@@ -162,11 +164,12 @@ if "script" in st.session_state and st.session_state.script:
                     with open(image_filename, "wb") as f:
                         f.write(image_data)
                     compress_image(image_filename, image_filename, quality=50)
+
+                    # Add text overlay
                     captioned_image_path = f"images/captioned_image_{idx}.jpg"
                     add_text_overlay(image_filename, sentence, captioned_image_path, local_font_path)
 
                     # Generate audio
-                    st.write(f"🎙️ Generating audio for: '{sentence}'")
                     audio = elevenlabs_client.text_to_speech.convert(
                         voice_id="pqHfZKP75CvOlQylNhV4",
                         model_id="eleven_multilingual_v2",
@@ -177,6 +180,9 @@ if "script" in st.session_state and st.session_state.script:
                     with open(audio_filename, "wb") as f:
                         for chunk in audio:
                             f.write(chunk)
+                    audio_files.append(audio_filename)
+
+                    # Create video clip
                     audio_clip = AudioFileClip(audio_filename)
                     image_clip = ImageClip(captioned_image_path, duration=audio_clip.duration).set_audio(audio_clip)
                     video_clips.append(image_clip.set_fps(30))
@@ -184,14 +190,34 @@ if "script" in st.session_state and st.session_state.script:
                     st.error(f"Failed to process frame {idx}: {e}")
                     continue
 
-            st.write("⏳ Concatenating video clips...")
+            # Combine video clips
+            st.write("⏳ Combining video clips...")
             final_video = concatenate_videoclips(video_clips, method="compose")
             final_video_path = "final_video.mp4"
             final_video.write_videofile(final_video_path, codec="libx264", audio_codec="aac", fps=24)
 
+            # Combine audio files
+            st.write("🎵 Combining audio...")
+            combined_audio_path = "combined_audio.mp3"
+            audio_files_str = "|".join(audio_files)
+            os.system(f"ffmpeg -y -i 'concat:{audio_files_str}' -acodec copy {combined_audio_path}")
+
             st.write("🎉 Video generation complete!")
             st.video(final_video_path)
+
+            # Download video
             with open(final_video_path, "rb") as video_file:
                 st.download_button("Download Video", video_file, file_name="final_video.mp4", mime="video/mp4")
+
+            # Download audio
+            with open(combined_audio_path, "rb") as audio_file:
+                st.download_button("Download Audio", audio_file, file_name="final_audio.mp3", mime="audio/mpeg")
+
+            # Download script
+            script_path = "script.txt"
+            with open(script_path, "w") as script_file:
+                script_file.write(st.session_state.script)
+            with open(script_path, "rb") as text_file:
+                st.download_button("Download Script", text_file, file_name="script.txt", mime="text/plain")
         except Exception as e:
             st.error(f"Failed to generate the video: {e}")
