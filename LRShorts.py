@@ -172,7 +172,7 @@ if "script" in st.session_state and st.session_state.script:
             for idx, sentence in enumerate(sentences):
                 st.write(f"🔄 Processing frame {idx + 1}/{len(sentences)}...")
                 try:
-                    # Generate image using DALL·E (latest version)
+            # Generate image using DALL·E (latest version)
             image_prompt = (
                 f"A visually stunning illustration of: {sentence}. "
                 f"Art style: {style_choice.lower()}. "
