@@ -94,14 +94,22 @@ if "summarized_topic" in st.session_state and st.session_state.summarized_topic:
 
     if duration_choice and style_choice and st.button("Generate Script"):
         try:
-            word_limit = (duration_choice // 5)  # Approx. 5 words per second
-            prompt = (f"Write a short story about the topic '{st.session_state.summarized_topic}' in no more than {word_limit} words. "
+            word_limit = duration_choice * 5  # 5 words per second
+            prompt = (f"Write a short story about the topic '{st.session_state.summarized_topic}' "
+                      f"in no more than {word_limit} words. "
                       f"Make it engaging, concise, and suitable for a video narration of {duration_choice} seconds.")
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}]
             )
-            story_script = response.choices[0].message.content
+            story_script = response.choices[0].message.content.strip()
+            
+            # Check if the script meets the word limit
+            word_count = len(story_script.split())
+            if word_count > word_limit:
+                story_script = " ".join(story_script.split()[:word_limit])  # Truncate to word limit
+                st.warning(f"The generated script exceeded the word limit. It has been truncated to {word_limit} words.")
+            
             st.session_state.script = story_script
         except Exception as e:
             st.error(f"Failed to generate script: {e}")
