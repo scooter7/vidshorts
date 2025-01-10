@@ -28,26 +28,49 @@ def compress_image(image_path, output_path, quality=50):
         img.save(output_path, "JPEG", quality=quality)
 
 def add_text_overlay(image_path, text, output_path, font_path):
-    img = Image.open(image_path).convert("RGBA")
-    draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype(font_path, size=30)
-    max_text_width = img.width - 40
-    wrapped_text = textwrap.fill(text, width=40)
-    text_bbox = draw.textbbox((0, 0), wrapped_text, font=font)
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
-    total_text_height = text_height + 20
-    x_start = 20
-    y_start = img.height - total_text_height - 20
-    background = Image.new("RGBA", img.size, (255, 255, 255, 0))
-    background_draw = ImageDraw.Draw(background)
-    background_draw.rectangle(
-        [(x_start - 10, y_start - 10), (x_start + text_width + 10, y_start + total_text_height + 10)],
-        fill=(0, 0, 0, 128)
-    )
-    img = Image.alpha_composite(img, background)
-    draw.text((x_start, y_start), wrapped_text, font=font, fill="white")
-    img.convert("RGB").save(output_path, "JPEG")
+    """
+    Add captions to an image using Pillow.
+    """
+    try:
+        img = Image.open(image_path).convert("RGBA")
+        draw = ImageDraw.Draw(img)
+
+        # Load font
+        font = ImageFont.truetype(font_path, size=30)
+
+        # Calculate text wrapping
+        max_text_width = img.width - 40  # Leave 20px padding on each side
+        wrapped_text = textwrap.fill(text, width=40)
+
+        # Measure text dimensions
+        text_bbox = draw.textbbox((0, 0), wrapped_text, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+
+        # Calculate positions
+        x_start = 20  # Padding
+        y_start = img.height - text_height - 40  # Place at bottom with padding
+
+        # Create semi-transparent rectangle for background
+        background = Image.new("RGBA", img.size, (255, 255, 255, 0))
+        background_draw = ImageDraw.Draw(background)
+        background_draw.rectangle(
+            [(x_start - 10, y_start - 10), (x_start + text_width + 20, y_start + text_height + 10)],
+            fill=(0, 0, 0, 128)  # Semi-transparent black
+        )
+
+        # Combine the image and the background
+        img = Image.alpha_composite(img, background)
+
+        # Draw text on the image
+        draw = ImageDraw.Draw(img)
+        draw.text((x_start, y_start), wrapped_text, font=font, fill="white")
+
+        # Save the output
+        img.convert("RGB").save(output_path, "JPEG")
+
+    except Exception as e:
+        raise RuntimeError(f"Error adding text overlay: {e}")
 
 def download_font(font_url, local_path):
     if not os.path.exists(local_path):
@@ -180,12 +203,12 @@ if "script" in st.session_state and st.session_state.script:
                     with open(audio_filename, "wb") as f:
                         for chunk in audio:
                             f.write(chunk)
-                    audio_files.append(audio_filename)
-
-                    # Create video clip
                     audio_clip = AudioFileClip(audio_filename)
+
+                    # Create video clip with captioned image and audio
                     image_clip = ImageClip(captioned_image_path, duration=audio_clip.duration).set_audio(audio_clip)
                     video_clips.append(image_clip.set_fps(30))
+
                 except Exception as e:
                     st.error(f"Failed to process frame {idx}: {e}")
                     continue
