@@ -172,21 +172,23 @@ if "script" in st.session_state and st.session_state.script:
             for idx, sentence in enumerate(sentences):
                 st.write(f"🔄 Processing frame {idx + 1}/{len(sentences)}...")
                 try:
-                    # Generate image
-                    image_prompt = f"{sentence} in {style_choice.lower()} style with no letters, no words, and no text at all in the images. "
-                    response = client.images.generate(
-                        model="dall-e-4",
-                        prompt=image_prompt,
-                        size="1024x1024",
-                        quality="standard",
-                        n=1
-                    )
-                    image_url = response.data[0].url
-                    image_filename = f"images/image_{idx}.jpg"
-                    image_data = requests.get(image_url).content
-                    with open(image_filename, "wb") as f:
-                        f.write(image_data)
-                    compress_image(image_filename, image_filename, quality=50)
+                    # Generate image using DALL·E (latest version)
+            image_prompt = (
+                f"A visually stunning illustration of: {sentence}. "
+                f"Art style: {style_choice.lower()}. "
+                f"Add intricate details and vibrant colors for a 1024x1024 resolution."
+            )
+            response = client.images.generate(
+                prompt=image_prompt,
+                size="1024x1024",
+                quality="high",
+                n=1
+            )
+            image_url = response.data[0].url
+            image_filename = f"images/image_{idx}.jpg"
+            image_data = requests.get(image_url).content
+            with open(image_filename, "wb") as f:
+                f.write(image_data)
 
                     # Add text overlay
                     captioned_image_path = f"images/captioned_image_{idx}.jpg"
