@@ -73,7 +73,7 @@ def extract_text_from_document(file):
 # Font setup
 font_url = "https://github.com/scooter7/vidshorts/blob/main/Arial.ttf"
 local_font_path = "Arial.ttf"
-download_font(font_url, local_font_path)
+download_font(font_url, local_path)
 
 # Placeholder image setup
 placeholder_url = "https://raw.githubusercontent.com/scooter7/vidshorts/main/placeholder.jpg"
@@ -97,6 +97,7 @@ if uploaded_file:
     try:
         full_text = extract_text_from_document(uploaded_file)
         if full_text:
+            st.write("📖 Summarizing the document...")
             summary_response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
@@ -118,6 +119,7 @@ if "summarized_topic" in st.session_state and st.session_state.summarized_topic:
 
     if st.button("Generate Script"):
         try:
+            st.write("📝 Generating the script...")
             word_limit = duration_choice * 5  # Approx. 5 words per second
             prompt = (f"Write a short story about the topic '{st.session_state.summarized_topic}' "
                       f"in no more than {word_limit} words. "
@@ -134,75 +136,62 @@ if "summarized_topic" in st.session_state and st.session_state.summarized_topic:
 
 if "script" in st.session_state and st.session_state.script:
     if st.button("Generate Video"):
-        sentences = st.session_state.script.split(". ")
-        video_clips = []
-        os.makedirs("images", exist_ok=True)
-        os.makedirs("audio", exist_ok=True)
-
-        audio_files = []
-        for idx, sentence in enumerate(sentences):
-            try:
-                # Generate image
-                image_prompt = f"{sentence} in {style_choice.lower()} style"
-                response = client.images.generate(
-                    model="dall-e-3",
-                    prompt=image_prompt,
-                    size="1024x1024",
-                    quality="standard",
-                    n=1
-                )
-                image_url = response.data[0].url
-                image_filename = f"images/image_{idx}.jpg"
-                image_data = requests.get(image_url).content
-                with open(image_filename, "wb") as f:
-                    f.write(image_data)
-                compress_image(image_filename, image_filename, quality=50)
-                captioned_image_path = f"images/captioned_image_{idx}.jpg"
-                add_text_overlay(image_filename, sentence, captioned_image_path, local_font_path)
-
-                # Generate audio
-                audio = elevenlabs_client.text_to_speech.convert(
-                    voice_id="pqHfZKP75CvOlQylNhV4",
-                    model_id="eleven_multilingual_v2",
-                    text=sentence,
-                    voice_settings={"stability": 0.2, "similarity_boost": 0.8}
-                )
-                audio_filename = f"audio/audio_{idx}.mp3"
-                with open(audio_filename, "wb") as f:
-                    for chunk in audio:
-                        f.write(chunk)
-                audio_files.append(audio_filename)
-                audio_clip = AudioFileClip(audio_filename)
-                image_clip = ImageClip(captioned_image_path, duration=audio_clip.duration).set_audio(audio_clip)
-                video_clips.append(image_clip.set_fps(30))
-            except Exception as e:
-                st.error(f"Failed to process frame {idx}: {e}")
-                continue
-
         try:
-            # Create final video
+            st.write("🎥 Starting video generation...")
+            sentences = st.session_state.script.split(". ")
+            video_clips = []
+            os.makedirs("images", exist_ok=True)
+            os.makedirs("audio", exist_ok=True)
+
+            for idx, sentence in enumerate(sentences):
+                st.write(f"🔄 Processing frame {idx + 1}/{len(sentences)}...")
+                try:
+                    # Generate image
+                    st.write(f"🖼️ Generating image for: '{sentence}'")
+                    image_prompt = f"{sentence} in {style_choice.lower()} style"
+                    response = client.images.generate(
+                        model="dall-e-3",
+                        prompt=image_prompt,
+                        size="1024x1024",
+                        quality="standard",
+                        n=1
+                    )
+                    image_url = response.data[0].url
+                    image_filename = f"images/image_{idx}.jpg"
+                    image_data = requests.get(image_url).content
+                    with open(image_filename, "wb") as f:
+                        f.write(image_data)
+                    compress_image(image_filename, image_filename, quality=50)
+                    captioned_image_path = f"images/captioned_image_{idx}.jpg"
+                    add_text_overlay(image_filename, sentence, captioned_image_path, local_font_path)
+
+                    # Generate audio
+                    st.write(f"🎙️ Generating audio for: '{sentence}'")
+                    audio = elevenlabs_client.text_to_speech.convert(
+                        voice_id="pqHfZKP75CvOlQylNhV4",
+                        model_id="eleven_multilingual_v2",
+                        text=sentence,
+                        voice_settings={"stability": 0.2, "similarity_boost": 0.8}
+                    )
+                    audio_filename = f"audio/audio_{idx}.mp3"
+                    with open(audio_filename, "wb") as f:
+                        for chunk in audio:
+                            f.write(chunk)
+                    audio_clip = AudioFileClip(audio_filename)
+                    image_clip = ImageClip(captioned_image_path, duration=audio_clip.duration).set_audio(audio_clip)
+                    video_clips.append(image_clip.set_fps(30))
+                except Exception as e:
+                    st.error(f"Failed to process frame {idx}: {e}")
+                    continue
+
+            st.write("⏳ Concatenating video clips...")
             final_video = concatenate_videoclips(video_clips, method="compose")
             final_video_path = "final_video.mp4"
             final_video.write_videofile(final_video_path, codec="libx264", audio_codec="aac", fps=24)
 
-            # Display and download video
+            st.write("🎉 Video generation complete!")
             st.video(final_video_path)
             with open(final_video_path, "rb") as video_file:
                 st.download_button("Download Video", video_file, file_name="final_video.mp4", mime="video/mp4")
-
-            # Combine audio files
-            combined_audio_path = "combined_audio.mp3"
-            os.system(f"ffmpeg -y -i 'concat:{'|'.join(audio_files)}' -acodec copy {combined_audio_path}")
-
-            # Download audio
-            with open(combined_audio_path, "rb") as audio_file:
-                st.download_button("Download Audio", audio_file, file_name="final_audio.mp3", mime="audio/mpeg")
-
-            # Save script as text file
-            script_path = "script.txt"
-            with open(script_path, "w") as script_file:
-                script_file.write(st.session_state.script)
-            with open(script_path, "rb") as text_file:
-                st.download_button("Download Script", text_file, file_name="script.txt", mime="text/plain")
         except Exception as e:
-            st.error(f"Failed to create the final video: {e}")
+            st.error(f"Failed to generate the video: {e}")
