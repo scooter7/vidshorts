@@ -181,6 +181,7 @@ if "script" in st.session_state and st.session_state.script:
                         f"A visually stunning illustration of: {sentence}. "
                         f"Art style: {style_choice.lower()}. "
                         f"Add intricate details and vibrant colors for a 1024x1024 resolution."
+                        f"Never include any text in the images."
                     )
                     response = client.images.generate(
                         prompt=image_prompt,
