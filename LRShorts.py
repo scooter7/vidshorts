@@ -146,7 +146,7 @@ if "summarized_topic" in st.session_state and st.session_state.summarized_topic:
             word_limit = duration_choice * 5  # Approx. 5 words per second
             prompt = (f"Write a short story about the topic '{st.session_state.summarized_topic}' "
                       f"in no more than {word_limit} words. "
-                      f"Make it engaging, concise, and suitable for a video narration of {duration_choice} seconds.")
+                      f"Make it engaging, concise, and suitable for a video narration of {duration_choice} seconds, but don't be overly dramatic in your word choice.")
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}]
@@ -173,7 +173,7 @@ if "script" in st.session_state and st.session_state.script:
                 st.write(f"🔄 Processing frame {idx + 1}/{len(sentences)}...")
                 try:
                     # Generate image
-                    image_prompt = f"{sentence} in {style_choice.lower()} style"
+                    image_prompt = f"{sentence} in {style_choice.lower()} style with no letters, no words, and no text at all in the images. "
                     response = client.images.generate(
                         model="dall-e-3",
                         prompt=image_prompt,
