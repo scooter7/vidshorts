@@ -175,10 +175,10 @@ if "script" in st.session_state and st.session_state.script:
                     # Generate image
                     image_prompt = f"{sentence} in {style_choice.lower()} style with no letters, no words, and no text at all in the images. "
                     response = client.images.generate(
-                        model="dall-e-3",
+                        model="dall-e-4",
                         prompt=image_prompt,
                         size="1024x1024",
-                        quality="standard",
+                        quality="high",
                         n=1
                     )
                     image_url = response.data[0].url
