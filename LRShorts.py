@@ -1,7 +1,7 @@
 import streamlit as st
 from openai import OpenAI
 from elevenlabs import ElevenLabs
-from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip, CompositeVideoClip
+from moviepy.editor import concatenate_videoclips, ImageClip, AudioFileClip
 from PIL import Image, ImageDraw, ImageFont
 import requests
 import os
@@ -9,6 +9,7 @@ import textwrap
 import PyPDF2
 from docx import Document
 
+# Styling for Streamlit app
 st.markdown("""
 <style>
 .stAppHeader { display: none !important; }
@@ -16,14 +17,37 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Environment variables for API keys
 os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 elevenlabs_client = ElevenLabs(api_key=st.secrets["elevenlabs_api_key"])
 
-# Helper Functions
+# Helper functions
 def compress_image(image_path, output_path, quality=50):
     with Image.open(image_path) as img:
         img.save(output_path, "JPEG", quality=quality)
+
+def add_text_overlay(image_path, text, output_path, font_path):
+    img = Image.open(image_path).convert("RGBA")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype(font_path, size=30)
+    max_text_width = img.width - 40
+    wrapped_text = textwrap.fill(text, width=40)
+    text_bbox = draw.textbbox((0, 0), wrapped_text, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+    total_text_height = text_height + 20
+    x_start = 20
+    y_start = img.height - total_text_height - 20
+    background = Image.new("RGBA", img.size, (255, 255, 255, 0))
+    background_draw = ImageDraw.Draw(background)
+    background_draw.rectangle(
+        [(x_start - 10, y_start - 10), (x_start + text_width + 10, y_start + total_text_height + 10)],
+        fill=(0, 0, 0, 128)
+    )
+    img = Image.alpha_composite(img, background)
+    draw.text((x_start, y_start), wrapped_text, font=font, fill="white")
+    img.convert("RGB").save(output_path, "JPEG")
 
 def download_font(font_url, local_path):
     if not os.path.exists(local_path):
@@ -46,12 +70,12 @@ def extract_text_from_document(file):
         text = ""
     return text
 
-# Font Setup
+# Font setup
 font_url = "https://github.com/scooter7/vidshorts/blob/main/Arial.ttf"
 local_font_path = "Arial.ttf"
 download_font(font_url, local_font_path)
 
-# Placeholder Image
+# Placeholder image setup
 placeholder_url = "https://raw.githubusercontent.com/scooter7/vidshorts/main/placeholder.jpg"
 placeholder_path = "placeholder.jpg"
 if not os.path.exists(placeholder_path):
@@ -63,51 +87,7 @@ if not os.path.exists(placeholder_path):
         st.error(f"Failed to download placeholder image: {e}")
         placeholder_path = None
 
-def add_text_overlay(image_path, text, output_path, font_path):
-    """
-    Add captions to an image using Pillow.
-    """
-    try:
-        img = Image.open(image_path).convert("RGBA")
-        draw = ImageDraw.Draw(img)
-
-        # Load font
-        font = ImageFont.truetype(font_path, size=30)
-
-        # Wrap text
-        max_text_width = img.width - 40  # Leave padding
-        wrapped_text = textwrap.fill(text, width=40)
-
-        # Calculate text size and position
-        text_bbox = draw.textbbox((0, 0), wrapped_text, font=font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
-        total_text_height = text_height + 20
-        x_start = 20
-        y_start = img.height - total_text_height - 20
-
-        # Create background rectangle for text
-        background = Image.new("RGBA", img.size, (255, 255, 255, 0))
-        background_draw = ImageDraw.Draw(background)
-        background_draw.rectangle(
-            [(x_start - 10, y_start - 10), (x_start + text_width + 10, y_start + total_text_height + 10)],
-            fill=(0, 0, 0, 128)  # Semi-transparent black
-        )
-
-        # Combine overlay and original image
-        img = Image.alpha_composite(img, background)
-
-        # Draw the text
-        draw = ImageDraw.Draw(img)
-        draw.text((x_start, y_start), wrapped_text, font=font, fill="white")
-
-        # Save the output image
-        img.convert("RGB").save(output_path, "JPEG")
-
-    except Exception as e:
-        raise RuntimeError(f"Error adding text overlay: {e}")
-
-# Streamlit App UI
+# Streamlit app
 st.title("Storytelling Video Creator with Document Upload")
 st.write("Generate videos with captions and select your desired image style.")
 
@@ -136,9 +116,9 @@ if "summarized_topic" in st.session_state and st.session_state.summarized_topic:
         ["Realistic", "Oil Painting", "Watercolor", "Sketch", "Fantasy Art", "3D Render"]
     )
 
-    if duration_choice and style_choice and st.button("Generate Script"):
+    if st.button("Generate Script"):
         try:
-            word_limit = duration_choice * 5  # 5 words per second
+            word_limit = duration_choice * 5  # Approx. 5 words per second
             prompt = (f"Write a short story about the topic '{st.session_state.summarized_topic}' "
                       f"in no more than {word_limit} words. "
                       f"Make it engaging, concise, and suitable for a video narration of {duration_choice} seconds.")
@@ -147,20 +127,12 @@ if "summarized_topic" in st.session_state and st.session_state.summarized_topic:
                 messages=[{"role": "user", "content": prompt}]
             )
             story_script = response.choices[0].message.content.strip()
-            
-            # Check if the script meets the word limit
-            word_count = len(story_script.split())
-            if word_count > word_limit:
-                story_script = " ".join(story_script.split()[:word_limit])  # Truncate to word limit
-                st.warning(f"The generated script exceeded the word limit. It has been truncated to {word_limit} words.")
-            
             st.session_state.script = story_script
+            st.text_area("Story Script", story_script, height=200, key="story_script")
         except Exception as e:
             st.error(f"Failed to generate script: {e}")
 
 if "script" in st.session_state and st.session_state.script:
-    st.text_area("Story Script", st.session_state.script, height=200, key="story_script")
-
     if st.button("Generate Video"):
         sentences = st.session_state.script.split(". ")
         video_clips = []
@@ -190,7 +162,7 @@ if "script" in st.session_state and st.session_state.script:
 
                 # Generate audio
                 audio = elevenlabs_client.text_to_speech.convert(
-                    voice_id="NYy9s57OPECPcDJavL3T",
+                    voice_id="pqHfZKP75CvOlQylNhV4",
                     model_id="eleven_multilingual_v2",
                     text=sentence,
                     voice_settings={"stability": 0.2, "similarity_boost": 0.8}
@@ -208,17 +180,29 @@ if "script" in st.session_state and st.session_state.script:
                 continue
 
         try:
-            # Create and preview final video
+            # Create final video
             final_video = concatenate_videoclips(video_clips, method="compose")
             final_video_path = "final_video.mp4"
             final_video.write_videofile(final_video_path, codec="libx264", audio_codec="aac", fps=24)
-            st.video(final_video_path)  # Preview video
 
-            # Download options
+            # Display and download video
+            st.video(final_video_path)
             with open(final_video_path, "rb") as video_file:
-                video_bytes = video_file.read()
-                st.download_button("Download Video", video_bytes, file_name="final_video.mp4", mime="video/mp4")
-            with open(audio_files[0], "rb") as audio_file:
-                st.download_button("Download Audio", audio_file, file_name="audio.mp3", mime="audio/mpeg")
+                st.download_button("Download Video", video_file, file_name="final_video.mp4", mime="video/mp4")
+
+            # Combine audio files
+            combined_audio_path = "combined_audio.mp3"
+            os.system(f"ffmpeg -y -i 'concat:{'|'.join(audio_files)}' -acodec copy {combined_audio_path}")
+
+            # Download audio
+            with open(combined_audio_path, "rb") as audio_file:
+                st.download_button("Download Audio", audio_file, file_name="final_audio.mp3", mime="audio/mpeg")
+
+            # Save script as text file
+            script_path = "script.txt"
+            with open(script_path, "w") as script_file:
+                script_file.write(st.session_state.script)
+            with open(script_path, "rb") as text_file:
+                st.download_button("Download Script", text_file, file_name="script.txt", mime="text/plain")
         except Exception as e:
             st.error(f"Failed to create the final video: {e}")
